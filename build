@@ -1,0 +1,61 @@
+#!/bin/bash
+# $IMAGE_NAME var is injected into the build so the tag is correct.
+set -e
+
+DUPLICATI_BRANCH=$1
+
+DEPLOY=$2
+
+IMAGE_NAME="mumblepins/duplicati"
+
+case "$DUPLICATI_BRANCH" in
+    canary)
+        regex='(_canary_|_experimental_|_beta_)'
+        ;;
+    experimental)
+        regex='(_experimental_|_beta_)'
+        ;;
+    beta)
+        regex='_beta_'
+        ;;
+    *)
+        echo "Error, invalid duplicati channel specified"
+        exit 1
+        ;;
+esac;
+
+
+
+release=$(curl -sSL https://api.github.com/repos/duplicati/duplicati/releases | \
+        jq -r 'label $out|.[]|(if .name |test("'$regex'") then (.,break $out) else empty end)')
+version=$(echo "$release" | jq -r .tag_name | sed -nr 's/^([^-]+)-.*$/\1/p')
+rname="$DUPLICATI_BRANCH-$version"
+
+url=$( echo "$release" | \
+        jq -r 'label $stop| .assets[]|(if (.name | contains(".zip")) and ((.name | contains("signatures"))|not) then (.browser_download_url, break $stop) else empty end)' )
+echo $url
+
+docker build \
+    --build-arg VCS_REF=$(git rev-parse --short HEAD) \
+    --build-arg BUILD_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+    --build-arg VERSION="$version" \
+    --build-arg DUPLICATI_URL="$url" \
+    -t "$IMAGE_NAME:$DUPLICATI_BRANCH" .
+
+docker tag "$IMAGE_NAME:$DUPLICATI_BRANCH" "$IMAGE_NAME:$rname"
+
+
+if [ "$DUPLICATI_BRANCH" = "beta" ]; then
+docker tag "$IMAGE_NAME:$DUPLICATI_BRANCH" "$IMAGE_NAME:latest"
+fi
+
+
+
+if [ "$DEPLOY" = "deploy" ]; then
+docker push "$IMAGE_NAME:$DUPLICATI_BRANCH"
+docker push "$IMAGE_NAME:$rname"
+if [ "$DUPLICATI_BRANCH" = "beta" ]; then
+docker push "$IMAGE_NAME:latest"
+fi
+fi
+

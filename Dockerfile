@@ -1,12 +1,12 @@
 FROM buildpack-deps:curl
 
-ARG DUPLICATI_BRANCH=canary
+ARG DUPLICATI_URL
 
 RUN set -ex; \
     apt-get update; \
-    export BUILD_DEPS='jq unzip'; \
-    apt-get install -y --no-install-recommends ${BUILD_DEPS}; \
+    export BUILD_DEPS='unzip'; \
     apt-get install -y --no-install-recommends \
+        ${BUILD_DEPS} \
         libmono-2.0-1 \
         libmono-microsoft-csharp4.0-cil \
         libmono-system-configuration4.0-cil \
@@ -29,30 +29,9 @@ RUN set -ex; \
         libsqlite3-0 \
         mono-runtime \
     ; \
-    cd /tmp; \
-    case "$DUPLICATI_BRANCH" in \
-        canary) \
-            regex='(_canary_|_experimental_|_beta_)' \
-            ;; \
-        experimental) \
-            regex='(_experimental_|_beta_)' \
-            ;; \
-        beta) \
-            regex='_beta_' \ 
-            ;; \
-        *) \
-            echo "Error, invalid duplicati channel specified" \ 
-            exit 1 \
-            ;; \
-    esac; \
-    \
-    url=$( curl -sSL https://api.github.com/repos/duplicati/duplicati/releases | \
-            jq -r 'label $out|.[]|(if .name |test("'$regex'") then (.,break $out) else empty end)' | \
-            jq -r 'label $stop| .assets[]|(if (.name | contains(".zip")) and ((.name | contains("signatures"))|not) then (.browser_download_url, break $stop) else empty end)' ) \
-    ;\
     mkdir -p /usr/lib/duplicati; \
     cd /usr/lib/duplicati; \
-    curl -sSL $url > duplicati.zip; \
+    curl -sSL "$DUPLICATI_URL" > duplicati.zip; \
     unzip duplicati.zip; \
     rm duplicati.zip; \
     apt-get autoremove -y --purge ${BUILD_DEPS}
@@ -66,13 +45,12 @@ EXPOSE 8200
 
 ARG BUILD_DATE
 ARG VCS_REF
-ARG VCS_URL
 ARG VERSION
 LABEL org.label-schema.build-date=$BUILD_DATE \
       org.label-schema.name="Duplicati on Docker" \
       org.label-schema.url="https://github.com/mumblepins-docker/docker-duplicati" \
       org.label-schema.vcs-ref=$VCS_REF \
-      org.label-schema.vcs-url=$VCS_URL \
+      org.label-schema.vcs-url="https://github.com/mumblepins-docker/docker-duplicati" \
       org.label-schema.version=$VERSION \
       org.label-schema.schema-version="1.0" \
       maintainer="Daniel Sullivan <https://github.com/mumblepins>"
