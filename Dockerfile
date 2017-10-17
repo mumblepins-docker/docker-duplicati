@@ -8,6 +8,7 @@ RUN set -ex; \
     apt-get install -y --no-install-recommends \
         ${BUILD_DEPS} \
         libmono-2.0-1 \
+        ca-certificates-mono \
         libmono-microsoft-csharp4.0-cil \
         libmono-system-configuration4.0-cil \
         libmono-system-configuration-install4.0-cil \
